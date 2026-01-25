@@ -1,0 +1,16 @@
+# OCI Free Tier Configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+# Get from: OCI Console → Profile → Tenancy → OCID
+tenancy_id = "ocid1.tenancy.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Your OCI region (e.g., us-phoenix-1, us-ashburn-1)
+region = "us-phoenix-1"
+
+# Usually same as region, unless you have multi-region identity setup
+home_region = "us-phoenix-1"
+
+# SSH key paths for node access
+# Generate with: ssh-keygen -t ed25519 -f ~/.ssh/oci-frkr
+ssh_public_key_path  = "~/.ssh/oci-frkr.pub"
+ssh_private_key_path = "~/.ssh/oci-frkr"
