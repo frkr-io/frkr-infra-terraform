@@ -25,7 +25,9 @@ NODE_SHAPE=$(jq -r '
 ' tfplan.json 2>/dev/null | head -1)
 
 if [ -z "$NODE_SHAPE" ]; then
-    echo "⚠️  Could not determine node shape (module may use different structure)"
+    echo "❌ Error: Could not determine node shape. logic may need update for this module structure."
+    rm -f tfplan.json
+    exit 1
 elif [ "$NODE_SHAPE" != "VM.Standard.A1.Flex" ]; then
     echo "❌ Node shape '$NODE_SHAPE' is NOT Always Free (expected VM.Standard.A1.Flex)"
     rm -f tfplan.json
@@ -39,17 +41,27 @@ echo "Checking OCPU allocation..."
 OCPUS=$(jq -r '
   .planned_values.root_module.child_modules[]?.resources[]? 
   | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_shape_config.ocpus // 2
+  | .values.node_shape_config.ocpus // empty
 ' tfplan.json 2>/dev/null | head -1)
 
 NODE_COUNT=$(jq -r '
   .planned_values.root_module.child_modules[]?.resources[]? 
   | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_config_details.size // 2
+  | .values.node_config_details.size // empty
 ' tfplan.json 2>/dev/null | head -1)
 
-OCPUS=${OCPUS:-2}
-NODE_COUNT=${NODE_COUNT:-2}
+if [ -z "$OCPUS" ]; then
+    echo "❌ Error: Could not determine OCPU count from plan."
+    rm -f tfplan.json
+    exit 1
+fi
+
+if [ -z "$NODE_COUNT" ]; then
+    echo "❌ Error: Could not determine Node Count from plan."
+    rm -f tfplan.json
+    exit 1
+fi
+
 TOTAL_OCPUS=$((OCPUS * NODE_COUNT))
 
 if [ "$TOTAL_OCPUS" -gt 4 ]; then
@@ -64,10 +76,15 @@ echo "Checking memory allocation..."
 MEMORY_GB=$(jq -r '
   .planned_values.root_module.child_modules[]?.resources[]? 
   | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_shape_config.memory_in_gbs // 12
+  | .values.node_shape_config.memory_in_gbs // empty
 ' tfplan.json 2>/dev/null | head -1)
 
-MEMORY_GB=${MEMORY_GB:-12}
+if [ -z "$MEMORY_GB" ]; then
+    echo "❌ Error: Could not determine Memory from plan."
+    rm -f tfplan.json
+    exit 1
+fi
+
 TOTAL_MEMORY=$((MEMORY_GB * NODE_COUNT))
 
 if [ "$TOTAL_MEMORY" -gt 24 ]; then
@@ -82,10 +99,19 @@ echo "Checking storage allocation..."
 BOOT_SIZE=$(jq -r '
   .planned_values.root_module.child_modules[]?.resources[]? 
   | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_source_details.boot_volume_size_in_gbs // 50
+  | .values.node_source_details.boot_volume_size_in_gbs // empty
 ' tfplan.json 2>/dev/null | head -1)
 
-BOOT_SIZE=${BOOT_SIZE:-50}
+if [ -z "$BOOT_SIZE" ]; then
+    # It's possible for boot volume to be default if not specified in TF, but for this check we want to be explicit.
+    # If the module defaults to 50, it should appear in planned_values. 
+    # If it is null in plan, that implies "provider default", which we can't verify easily.
+    # However, assuming "empty" here is risky. Let's error.
+    echo "❌ Error: Could not determine Boot Volume size from plan."
+    rm -f tfplan.json
+    exit 1
+fi
+
 TOTAL_STORAGE=$((BOOT_SIZE * NODE_COUNT))
 
 if [ "$TOTAL_STORAGE" -gt 200 ]; then
