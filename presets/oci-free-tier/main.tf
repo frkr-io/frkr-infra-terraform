@@ -6,19 +6,21 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">= 5.0"
+      version = ">= 4.123.0"
     }
   }
 }
 
 # Provider configuration
 provider "oci" {
-  region = var.region
+  tenancy_ocid = var.tenancy_id
+  region       = var.region
 }
 
 provider "oci" {
-  alias  = "home"
-  region = var.home_region
+  alias        = "home"
+  tenancy_ocid = var.tenancy_id
+  region       = var.home_region
 }
 
 # Use the OCI module with free tier defaults

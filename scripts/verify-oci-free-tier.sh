@@ -1,31 +1,36 @@
 #!/bin/bash
 # Verify OCI Terraform plan stays within Always Free limits
-# Usage: terraform plan -out=tfplan && ./verify-oci-free-tier.sh
+# Usage: tofu plan -out=tfplan && ./verify-oci-free-tier.sh
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=== OCI Free Tier Verification ==="
+# Detect tofu or terraform
+TF_CMD="terraform"
+if command -v tofu &> /dev/null; then
+    TF_CMD="tofu"
+fi
+
+echo "=== OCI Free Tier Verification (using $TF_CMD) ==="
 
 # Check if tfplan exists
 if [ ! -f "tfplan" ]; then
-    echo "Error: tfplan not found. Run 'terraform plan -out=tfplan' first."
+    echo "Error: tfplan not found. Run '$TF_CMD plan -out=tfplan' first."
     exit 1
 fi
 
 # Generate JSON plan
-terraform show -json tfplan > tfplan.json
+$TF_CMD show -json tfplan > tfplan.json
 
 # Check 1: Node shape must be VM.Standard.A1.Flex (ARM, free tier)
 echo "Checking node shape..."
 NODE_SHAPE=$(jq -r '
-  .planned_values.root_module.child_modules[]?.resources[]? 
-  | select(.type=="oci_containerengine_node_pool") 
+  [.. | objects | select(.type? == "oci_containerengine_node_pool")][0]
   | .values.node_shape // empty
-' tfplan.json 2>/dev/null | head -1)
+' tfplan.json 2>/dev/null)
 
 if [ -z "$NODE_SHAPE" ]; then
-    echo "❌ Error: Could not determine node shape. logic may need update for this module structure."
+    echo "❌ Error: Could not determine node shape. Resource 'oci_containerengine_node_pool' not found in plan."
     rm -f tfplan.json
     exit 1
 elif [ "$NODE_SHAPE" != "VM.Standard.A1.Flex" ]; then
@@ -39,16 +44,14 @@ fi
 # Check 2: Total OCPUs <= 4
 echo "Checking OCPU allocation..."
 OCPUS=$(jq -r '
-  .planned_values.root_module.child_modules[]?.resources[]? 
-  | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_shape_config.ocpus // empty
-' tfplan.json 2>/dev/null | head -1)
+  [.. | objects | select(.type? == "oci_containerengine_node_pool")][0]
+  | .values.node_shape_config[0].ocpus // empty
+' tfplan.json 2>/dev/null)
 
 NODE_COUNT=$(jq -r '
-  .planned_values.root_module.child_modules[]?.resources[]? 
-  | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_config_details.size // empty
-' tfplan.json 2>/dev/null | head -1)
+  [.. | objects | select(.type? == "oci_containerengine_node_pool")][0]
+  | .values.node_config_details[0].size // empty
+' tfplan.json 2>/dev/null)
 
 if [ -z "$OCPUS" ]; then
     echo "❌ Error: Could not determine OCPU count from plan."
@@ -74,10 +77,9 @@ echo "✅ Total OCPUs: $TOTAL_OCPUS / 4 (within free tier)"
 # Check 3: Total memory <= 24GB
 echo "Checking memory allocation..."
 MEMORY_GB=$(jq -r '
-  .planned_values.root_module.child_modules[]?.resources[]? 
-  | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_shape_config.memory_in_gbs // empty
-' tfplan.json 2>/dev/null | head -1)
+  [.. | objects | select(.type? == "oci_containerengine_node_pool")][0]
+  | .values.node_shape_config[0].memory_in_gbs // empty
+' tfplan.json 2>/dev/null)
 
 if [ -z "$MEMORY_GB" ]; then
     echo "❌ Error: Could not determine Memory from plan."
@@ -97,10 +99,9 @@ echo "✅ Total memory: ${TOTAL_MEMORY}GB / 24GB (within free tier)"
 # Check 4: Boot volume <= 200GB total
 echo "Checking storage allocation..."
 BOOT_SIZE=$(jq -r '
-  .planned_values.root_module.child_modules[]?.resources[]? 
-  | select(.type=="oci_containerengine_node_pool") 
-  | .values.node_source_details.boot_volume_size_in_gbs // empty
-' tfplan.json 2>/dev/null | head -1)
+  [.. | objects | select(.type? == "oci_containerengine_node_pool")][0]
+  | .values.node_source_details[0].boot_volume_size_in_gbs // empty
+' tfplan.json 2>/dev/null)
 
 if [ -z "$BOOT_SIZE" ]; then
     # It's possible for boot volume to be default if not specified in TF, but for this check we want to be explicit.

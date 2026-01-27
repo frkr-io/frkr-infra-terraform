@@ -1,21 +1,13 @@
 output "kubeconfig" {
   description = "Kubeconfig content for the OKE cluster"
-  value       = module.oke_free.kubeconfig
+  value       = data.oci_containerengine_cluster_kube_config.default.content
   sensitive   = true
 }
 
-output "kubeconfig_path" {
-  description = "Path to the generated kubeconfig file"
-  value       = module.oke_free.kubeconfig_path
-}
+# kubeconfig_path is determined by the caller (preset), not this module.
+# We remove it from here to avoid confusion/errors.
 
 output "cluster_endpoint" {
   description = "Kubernetes API server endpoint"
-  value       = module.oke_free.cluster_endpoint
-}
-
-output "cluster_ca_certificate" {
-  description = "Base64-encoded cluster CA certificate"
-  value       = module.oke_free.cluster_ca_certificate
-  sensitive   = true
+  value       = data.oci_containerengine_clusters.default.clusters[0].endpoints[0].public_endpoint
 }
