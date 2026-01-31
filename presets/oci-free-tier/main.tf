@@ -6,7 +6,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">= 4.123.0"
+      version = ">= 6.0.0"
     }
   }
 }
@@ -33,10 +33,6 @@ module "cluster" {
   ssh_public_key_path  = var.ssh_public_key_path
   ssh_private_key_path = var.ssh_private_key_path
   node_pool_size       = 2  # 2 nodes × 2 OCPUs = 4 OCPUs (free tier max)
-
-  providers = {
-    oci.home = oci.home
-  }
 }
 
 # Write kubeconfig to local file

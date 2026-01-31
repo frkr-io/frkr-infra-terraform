@@ -1,0 +1,4 @@
+# Azure Configuration
+# Copy this to terraform.tfvars
+
+location = "westus2"
