@@ -2,3 +2,6 @@
 # Copy this to terraform.tfvars
 
 location = "westus2"
+
+# Run `az account show` to get your Subscription ID
+subscription_id = "00000000-0000-0000-0000-000000000000"

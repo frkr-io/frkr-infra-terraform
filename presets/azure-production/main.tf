@@ -10,6 +10,13 @@ terraform {
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
+  resource_provider_registrations = "none"
+}
+
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
 }
 
 variable "location" {
@@ -37,5 +44,6 @@ resource "local_file" "kubeconfig" {
 }
 
 output "cluster_endpoint" {
-  value = module.cluster.cluster_endpoint
+  value     = module.cluster.cluster_endpoint
+  sensitive = true
 }
